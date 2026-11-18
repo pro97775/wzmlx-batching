@@ -28,7 +28,7 @@ pillow
 psutil
 pycountry
 pymongo
-pyrotgfork
+wzgram
 pytgcrypto
 python-magic
 pytz

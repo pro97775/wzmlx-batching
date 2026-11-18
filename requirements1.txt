@@ -27,7 +27,7 @@ pillow==13.0.0
 psutil==7.2.2
 pycountry==26.2.16
 pymongo==4.20.0
-pyrotgfork==2.2.24.1
+wzgram==3.1.7
 pytgcrypto==1.2.12
 python-magic==0.4.27
 pytz==2026.6
@@ -75,7 +75,7 @@ pillow
 psutil
 pycountry
 pymongo
-pyrotgfork
+wzgram
 pytgcrypto
 python-magic
 pytz
