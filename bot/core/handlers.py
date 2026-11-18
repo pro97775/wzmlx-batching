@@ -4,6 +4,7 @@ from pyrogram.filters import command, regex
 from pyrogram.handlers import CallbackQueryHandler, EditedMessageHandler, MessageHandler
 from pyrogram.types import BotCommand
 
+from .. import bot_loop
 from ..core.config_manager import Config
 from ..helper.ext_utils.help_messages import BOT_COMMANDS
 from ..helper.telegram_helper.bot_commands import BotCommands
@@ -465,14 +466,16 @@ def add_handlers():
                 BOT_COMMANDS, "Login", "[password] Login to Bot", 14
             )
 
-        TgClient.bot.set_bot_commands(
-            [
-                BotCommand(
-                    cmds[0] if isinstance(cmds, list) else cmds,
-                    description,
-                )
-                for cmd, description in BOT_COMMANDS.items()
-                for cmds in [getattr(BotCommands, f"{cmd}Command", None)]
-                if cmds is not None
-            ]
+        bot_loop.create_task(
+            TgClient.bot.set_bot_commands(
+                [
+                    BotCommand(
+                        cmds[0] if isinstance(cmds, list) else cmds,
+                        description,
+                    )
+                    for cmd, description in BOT_COMMANDS.items()
+                    for cmds in [getattr(BotCommands, f"{cmd}Command", None)]
+                    if cmds is not None
+                ]
+            )
         )
