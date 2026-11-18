@@ -29,7 +29,7 @@ psutil
 pycountry
 pymongo
 wzgram
-pytgcrypto
+# pytgcrypto
 python-magic
 pytz
 qbittorrent-api
