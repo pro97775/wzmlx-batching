@@ -53,18 +53,23 @@ async def update_qb_options():
             )
             return
         opt = await TorrentManager.qbittorrent.app.preferences()
+        if "recheck_completed_torrent" in opt:
+            opt["recheck_completed_torrent"] = False
         qbit_options.update(opt)
         del qbit_options["listen_port"]
         for k in list(qbit_options.keys()):
             if k.startswith("rss"):
                 del qbit_options[k]
         qbit_options["web_ui_password"] = pwd
-        await TorrentManager.qbittorrent.app.set_preferences(
-            {"web_ui_password": pwd}
-        )
+        prefs = {"web_ui_password": pwd}
+        if "recheck_completed_torrent" in opt:
+            prefs["recheck_completed_torrent"] = False
+        await TorrentManager.qbittorrent.app.set_preferences(prefs)
     else:
         if qbit_options.get("web_ui_password") in ("admin", "admin1", ""):
             qbit_options["web_ui_password"] = pwd
+        if "recheck_completed_torrent" in qbit_options:
+            qbit_options["recheck_completed_torrent"] = False
         await TorrentManager.qbittorrent.app.set_preferences(qbit_options)
 
 
