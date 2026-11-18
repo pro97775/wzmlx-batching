@@ -59,7 +59,12 @@ DB_PART = db_partition_id(BOT_ID)
 
 if DATABASE_URL := config_file.get("DATABASE_URL", "").strip():
     try:
-        conn = MongoClient(DATABASE_URL, server_api=ServerApi("1"))
+        conn = MongoClient(
+            DATABASE_URL,
+            server_api=ServerApi("1"),
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=5000,
+        )
         db = conn.wzmlx
         config_dict = db.settings.config.find_one({"_id": DB_PART})
         if config_dict is None:
@@ -108,5 +113,8 @@ if UPSTREAM_REPO:
 
 UPDATE_PKGS = config_file.get("UPDATE_PKGS", "True")
 if (isinstance(UPDATE_PKGS, str) and UPDATE_PKGS.lower() == "true") or UPDATE_PKGS:
+    scall("uv pip uninstall pyrotgfork >/dev/null 2>&1 || true", shell=True)
+    scall("uv pip uninstall pyrogram >/dev/null 2>&1 || true", shell=True)
+    scall("uv pip uninstall pytgcrypto >/dev/null 2>&1 || true", shell=True)
     scall("uv pip install -U -r requirements.txt", shell=True)
     log_info("Successfully Updated all the Packages !")
