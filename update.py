@@ -152,6 +152,7 @@ def _update_packages(update_pkgs):
     if (isinstance(update_pkgs, str) and update_pkgs.lower() == "true") or update_pkgs:
         scall("uv pip uninstall pyrotgfork >/dev/null 2>&1 || true", shell=True)
         scall("uv pip uninstall pyrogram >/dev/null 2>&1 || true", shell=True)
+        scall("uv pip uninstall pytgcrypto >/dev/null 2>&1 || true", shell=True)
         scall("uv pip install -U -r requirements.txt", shell=True)
         _LOGGER.info("Successfully Updated all the Packages!")
 
