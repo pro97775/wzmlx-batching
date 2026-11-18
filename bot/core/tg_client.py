@@ -42,7 +42,7 @@ class TgClient:
         kwargs["in_memory"] = True
         for param, value in {
             "max_concurrent_transmissions": 100,
-            "skip_updates": False,
+            "skip_updates": True,
         }.items():
             if param in signature(Client.__init__).parameters:
                 kwargs[param] = value
