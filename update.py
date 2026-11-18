@@ -85,7 +85,12 @@ def _db_partition_id(bot_id):
 
 
 async def _fetch_db_config(database_url, db_part):
-    conn = AsyncMongoClient(database_url, server_api=ServerApi("1"))
+    conn = AsyncMongoClient(
+        database_url,
+        server_api=ServerApi("1"),
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+    )
     try:
         db = conn.wzmlx
         return await db.settings.config.find_one({"_id": db_part}, {"_id": 0})

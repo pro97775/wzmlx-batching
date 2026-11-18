@@ -5,6 +5,7 @@ from os import environ, path as ospath, getenv
 from aiofiles import open as aiopen
 from aiofiles.os import makedirs, remove, path as aiopath
 from aioshutil import rmtree
+from pymongo.errors import PyMongoError
 
 
 from .. import (
@@ -98,6 +99,14 @@ async def update_nzb_options():
 
 
 async def load_settings():
+    try:
+        await _load_settings()
+    except PyMongoError as e:
+        LOGGER.error(f"Database ERROR: {e}")
+        database._return = True
+
+
+async def _load_settings():
     if not Config.DATABASE_URL:
         return
     for p in ["thumbnails", "tokens", "rclone"]:
