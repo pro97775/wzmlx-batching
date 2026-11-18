@@ -28,6 +28,7 @@ from .qbit_listener import on_download_start
 
 METADATA_TIMEOUT = 300
 STOPPED_ABORT = 60
+CHECKING_ABORT = 600
 ACTIVE_STATES = (
     "downloading",
     "uploading",
@@ -105,6 +106,8 @@ class QbitBatch(BatchRunner):
         )
         self.hash = hash_
         self.save_path = save_path
+        self.active_ids = []
+        self.priorities_initialized = False
 
     async def _apply_batch(self, batch):
         batch_ids = [file_info["index"] for file_info in batch]
@@ -113,13 +116,20 @@ class QbitBatch(BatchRunner):
             tor_info = await _torrent_info(self.hash)
             if tor_info is not None and tor_info.state in ACTIVE_STATES:
                 await TorrentManager.qbittorrent.torrents.stop([self.hash])
-            if all_ids:
+            if not self.priorities_initialized:
+                if all_ids:
+                    await TorrentManager.qbittorrent.torrents.file_prio(
+                        self.hash, all_ids, 0
+                    )
+                self.priorities_initialized = True
+            elif self.active_ids:
                 await TorrentManager.qbittorrent.torrents.file_prio(
-                    self.hash, all_ids, 0
+                    self.hash, self.active_ids, 0
                 )
             await TorrentManager.qbittorrent.torrents.file_prio(
                 self.hash, batch_ids, 1
             )
+            self.active_ids = batch_ids
             await TorrentManager.qbittorrent.torrents.start([self.hash])
         except Exception as error:
             raise BatchError(
@@ -139,6 +149,7 @@ class QbitBatch(BatchRunner):
     async def _wait_batch(self, batch):
         indices = {file_info["index"]: file_info for file_info in batch}
         stopped_time = 0
+        checking_time = 0
         failures = 0
         while True:
             if self.listener.is_cancelled or intervals["stopAll"]:
@@ -158,6 +169,18 @@ class QbitBatch(BatchRunner):
             state = tor_info.state
             if state in ("error", "missingFiles"):
                 raise BatchError("qBittorrent could not download the current batch.")
+            if state in ("checkingUP", "checkingDL", "checkingResumeData"):
+                checking_time += 3
+                if checking_time >= CHECKING_ABORT:
+                    raise BatchError(
+                        "qBittorrent is stuck checking the torrent files."
+                    )
+                await sleep(3)
+                continue
+            if state in ("moving", "allocating"):
+                await sleep(3)
+                continue
+            checking_time = 0
             if state in ("stoppedDL", "stoppedUP", "pausedDL", "pausedUP"):
                 stopped_time += 3
                 if stopped_time >= STOPPED_ABORT:
@@ -199,6 +222,16 @@ class QbitBatch(BatchRunner):
             await TorrentManager.qbittorrent.torrents.stop([self.hash])
         except Exception as error:
             LOGGER.error(f"qBittorrent batch stop before upload: {error}")
+
+    async def _before_file_delete(self, file_info, path):
+        try:
+            await TorrentManager.qbittorrent.torrents.file_prio(
+                self.hash, [file_info["index"]], 0
+            )
+        except Exception as error:
+            LOGGER.error(
+                f"qBittorrent could not mark {file_info['name']} unwanted: {error}"
+            )
 
     async def _restore_status(self):
         async with task_dict_lock:

@@ -1,4 +1,4 @@
-from asyncio import Event
+from asyncio import Event, gather
 from time import time
 
 from ... import (
@@ -9,16 +9,18 @@ from ... import (
     queue_dict_lock,
     queued_dl,
     queued_up,
+    task_dict,
     user_data,
 )
 from ...core.config_manager import Config
 from ..mirror_leech_utils.gdrive_utils.search import GoogleDriveSearch
 from ..telegram_helper.filters import CustomFilters
+from ..telegram_helper.button_build import ButtonMaker
 from ..telegram_helper.tg_utils import check_botpm, forcesub, verify_token
 from .bot_utils import get_telegraph_list, sync_to_async, safe_int
 from .files_utils import get_base_name, check_storage_threshold
 from .links_utils import is_gdrive_id
-from .status_utils import get_readable_time, get_readable_file_size, get_specific_tasks
+from .status_utils import get_readable_time, get_readable_file_size
 
 
 async def stop_duplicate_check(listener):
@@ -253,44 +255,55 @@ async def pre_task_check(message):
     if Config.RSS_CHAT and user_id == int(Config.RSS_CHAT):
         return msg, button
     user_dict = user_data.get(user_id, {})
+    button = ButtonMaker()
+    checks = []
     if message.chat.type != message.chat.type.BOT:
-        if ids := Config.FORCE_SUB_IDS:
-            _msg, button = await forcesub(message, ids, button)
-            if _msg:
-                msg.append(_msg)
-        if Config.BOT_PM or user_dict.get("BOT_PM"):  # or config_dict['SAFE_MODE']:
-            _msg, button = await check_botpm(message, button)
-            if _msg:
-                msg.append(_msg)
+        if Config.FORCE_SUB_IDS:
+            checks.append(forcesub(message, Config.FORCE_SUB_IDS, button))
+        if Config.BOT_PM or user_dict.get("BOT_PM"):
+            checks.append(check_botpm(message, button))
+    checks.append(verify_token(user_id, button))
+
+    results = await gather(*checks)
+    for _msg, _ in results:
+        if _msg:
+            msg.append(_msg)
+
     if (uti := Config.USER_TIME_INTERVAL) and (
         ut := await user_interval_check(user_id)
     ):
         msg.append(
             f"┠ <b>Waiting Time</b> → {get_readable_time(ut)}\n┠ <i>User's Time Interval Restrictions</i> → {get_readable_time(uti)}"
         )
+
+    all_tasks = list(task_dict.values())
     bmax_tasks = safe_int(user_dict.get("bmax_tasks", Config.BOT_MAX_TASKS))
-    if bmax_tasks > 0 and len(await get_specific_tasks("All", False)) >= bmax_tasks:
+    if bmax_tasks > 0 and len(all_tasks) >= bmax_tasks:
         msg.append(
             f"┠ Max Concurrent Bot's Tasks Limit exceeded.\n┠ Bot Tasks Limit : {bmax_tasks} task"
         )
 
     maxtask = safe_int(user_dict.get("maxtask", Config.USER_MAX_TASKS))
-    if maxtask > 0 and len(await get_specific_tasks("All", user_id)) >= maxtask:
-        msg.append(
-            f"┠ Max Concurrent User's Task(s) Limit exceeded! \n┠ User Task Limit : {maxtask} tasks"
-        )
-
-    token_msg, button = await verify_token(user_id, button)
-    if token_msg is not None:
-        msg.append(token_msg)
+    if maxtask > 0:
+        user_tasks = [
+            task
+            for task in all_tasks
+            if getattr(task.listener, "user_id", None) == user_id
+        ]
+        if len(user_tasks) >= maxtask:
+            msg.append(
+                f"┠ Max Concurrent User's Task(s) Limit exceeded! \n┠ User Task Limit : {maxtask} tasks"
+            )
 
     if msg:
         username = message.from_user.mention
         final_msg = f"⌬ <b>Task Checks :</b>\n│\n┟ <b>Name</b> → {username}\n┃\n"
-        for i, m_part in enumerate(msg, 1):
+        for m_part in msg:
             final_msg += f"{m_part}\n"
-        if button is not None:
+        if any(button.buttons.values()):
             button = button.build_menu(2)
+        else:
+            button = None
         return final_msg, button
 
     return None, None

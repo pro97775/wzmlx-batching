@@ -347,7 +347,7 @@ class DbManager:
 
     async def get_uploaded_file_keys(self, user_id, engine, hash_):
         if self._return:
-            return set()
+            return None
         try:
             cursor = self.db.batch_files[_part()].find(
                 {
@@ -361,7 +361,7 @@ class DbManager:
             return {doc["_id"] async for doc in cursor}
         except PyMongoError as e:
             LOGGER.error(f"Failed to load uploaded torrent files: {e}")
-            return set()
+            return None
 
     async def clear_uploaded_files(self, user_id, engine=None, hash_=None):
         if self._return:

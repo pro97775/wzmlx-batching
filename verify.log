@@ -1,0 +1,11 @@
+PY_COMPILE=0
+bot/helper/ext_utils/task_manager.py:180:9: `nonlocal yt_playlist` is unused: name is never assigned in scope
+bot/helper/ext_utils/task_manager.py:180:9: `nonlocal size` is unused: name is never assigned in scope
+PYFLAKES_TASK_MANAGER=1
+PYFLAKES_TG_UTILS=0
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.004s
+
+OK
+UNITTEST=0

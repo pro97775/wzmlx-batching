@@ -161,16 +161,25 @@ class BatchRunner:
         if not getattr(self.listener, "skip_uploaded_files", False):
             return
         if not Config.DATABASE_URL:
-            LOGGER.warning(
-                "Skipping already uploaded files requires DATABASE_URL."
+            raise BatchError(
+                "Skipping already uploaded files requires DATABASE_URL. "
+                "Disable Skip Uploaded Files if you do not have a database."
             )
-            return
         try:
             self.uploaded_keys = await database.get_uploaded_file_keys(
                 self.listener.user_id, self.engine, self.hash
             )
         except Exception as error:
             LOGGER.error(f"Could not load uploaded file history: {error}")
+            raise BatchError(
+                "Could not read the uploaded-file history from MongoDB. "
+                "Batching stopped to avoid duplicate uploads."
+            ) from error
+        if self.uploaded_keys is None:
+            raise BatchError(
+                "Could not read the uploaded-file history from MongoDB. "
+                "Batching stopped to avoid duplicate uploads."
+            )
 
     async def _mark_downloaded(self, batch):
         if not getattr(self.listener, "skip_uploaded_files", False):
@@ -321,6 +330,7 @@ class BatchRunner:
                     await self._abort("")
                     return
                 await self._upload_batch(batch)
+                await self._release_upload_slot()
                 if self.listener.is_cancelled or intervals["stopAll"]:
                     await self._abort("")
                     return
@@ -341,6 +351,11 @@ class BatchRunner:
     async def _release_slot(self):
         async with queue_dict_lock:
             non_queued_dl.discard(self.listener.mid)
+            non_queued_up.discard(self.listener.mid)
+        await start_from_queued()
+
+    async def _release_upload_slot(self):
+        async with queue_dict_lock:
             non_queued_up.discard(self.listener.mid)
         await start_from_queued()
 
@@ -426,8 +441,12 @@ class BatchRunner:
             if job.error:
                 self.error = job.error
                 return
+            if not job.result:
+                self.error = f"Upload did not complete for {job.name}"
+                return
             self._record_result(job)
             await self._mark_uploaded(file_info, job)
+            await self._before_file_delete(file_info, path)
             await self._delete_local(path)
             self.uploaded_count += 1
             self.uploaded_size += file_info["size"]
@@ -436,6 +455,9 @@ class BatchRunner:
 
     async def _stop_download_for_upload(self, batch):
         raise NotImplementedError
+
+    async def _before_file_delete(self, file_info, path):
+        pass
 
     async def _upload_one(self, job):
         gid = self.hash
