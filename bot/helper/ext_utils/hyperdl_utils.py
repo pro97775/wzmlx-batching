@@ -130,7 +130,7 @@ class HyperTGDownload:
     async def _get_session(self, idx, dc_id, force=False):
         s = self._sessions.get(idx)
         if s and not force:
-            if s.is_connected and s.dc_id == dc_id:
+            if s.is_started.is_set() and s.dc_id == dc_id:
                 return s
             try:
                 await s.stop()
@@ -153,7 +153,7 @@ class HyperTGDownload:
         self._sessions.clear()
         for s in sessions:
             try:
-                if s.is_connected:
+                if s.is_started.is_set():
                     await s.stop()
             except Exception:
                 pass

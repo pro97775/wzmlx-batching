@@ -168,6 +168,7 @@ class TaskConfig:
             "SUPERGROUP",
             "CHANNEL",
             "FORUM",
+            "COMMUNITY",
         ]
         self.source_url = None
         self.bot_pm = Config.BOT_PM or self.user_dict.get("BOT_PM")
@@ -555,6 +556,7 @@ class TaskConfig:
                             "CHANNEL",
                             "GROUP",
                             "FORUM",
+                            "COMMUNITY",
                         ]:
                             self.user_transmission = False
                             self.hybrid_leech = False
@@ -584,6 +586,7 @@ class TaskConfig:
                             "CHANNEL",
                             "GROUP",
                             "FORUM",
+                            "COMMUNITY",
                         ]:
                             member = await chat.get_member(uploader_id)
                             if (

@@ -27,7 +27,7 @@
    - API Hash
 3. **Python dependencies**:
    ```bash
-   pip install pyrogram tgcrypto
+   pip install wzgram
    ```
 
 ---
@@ -126,7 +126,7 @@ This string contains encrypted credentials for your Telegram account.
 | `Invalid API key format` | Wrong format | Use format: `12345678:AbCdEfGh...` |
 | `API HASH must be 32 characters` | Wrong length | Copy exact 32 chars from my.telegram.org |
 | `Invalid phone format` | Missing country code | Include + and country code |
-| `Pyrogram not installed` | Missing dependencies | `pip install pyrogram tgcrypto` |
+| `Pyrogram not installed` | Missing dependencies | `pip install wzgram` |
 
 ### Common Issues
 
