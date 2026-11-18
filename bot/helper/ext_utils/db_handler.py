@@ -177,9 +177,12 @@ class DbManager:
                 }
             }
         ]
-        await self.db.users[_part()].update_one(
-            {"_id": user_id}, pipeline, upsert=True
-        )
+        try:
+            await self.db.users[_part()].update_one(
+                {"_id": user_id}, pipeline, upsert=True
+            )
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to save user data {user_id}: {e}")
 
     async def update_user_doc(self, user_id, key, path=""):
         if self._return:
@@ -245,14 +248,22 @@ class DbManager:
     async def set_pm_users(self, user_id):
         if self._return:
             return
-        if not bool(await self.db.pm_users[_part()].find_one({"_id": user_id})):
-            await self.db.pm_users[_part()].insert_one({"_id": user_id})
-            LOGGER.info(f"New PM User Added : {user_id}")
+        try:
+            if not bool(
+                await self.db.pm_users[_part()].find_one({"_id": user_id})
+            ):
+                await self.db.pm_users[_part()].insert_one({"_id": user_id})
+                LOGGER.info(f"New PM User Added : {user_id}")
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to save PM user {user_id}: {e}")
 
     async def rm_pm_user(self, user_id):
         if self._return:
             return
-        await self.db.pm_users[_part()].delete_one({"_id": user_id})
+        try:
+            await self.db.pm_users[_part()].delete_one({"_id": user_id})
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to remove PM user {user_id}: {e}")
 
     async def rm_complete_task(self, link):
         if self._return:

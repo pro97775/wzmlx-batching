@@ -105,7 +105,10 @@ async def start(_, message):
             reply_markup,
             photo="IMAGES",
         )
-    await database.set_pm_users(userid)
+    try:
+        await database.set_pm_users(userid)
+    except Exception as e:
+        LOGGER.error(f"Failed to record PM user {userid}: {e}")
 
 
 @new_task
