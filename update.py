@@ -18,7 +18,7 @@ from subprocess import run as srun, call as scall
 
 getLogger("pymongo").setLevel(ERROR)
 
-var_list = ['BOT_TOKEN', 'TELEGRAM_API', 'TELEGRAM_HASH', 'OWNER_ID', 'DATABASE_URL', 'BASE_URL', 'UPSTREAM_REPO', 'UPSTREAM_BRANCH']
+var_list = ['BOT_TOKEN', 'TELEGRAM_API', 'TELEGRAM_HASH', 'OWNER_ID', 'DATABASE_URL', 'BASE_URL', 'UPSTREAM_REPO', 'UPSTREAM_BRANCH', 'UPDATE_PKGS']
 DB_OVERRIDE_KEYS = ("UPSTREAM_REPO", "UPSTREAM_BRANCH", "UPDATE_PKGS")
 DB_PARTITION_SALT = b"wzmlx_v3_db_partition_salt"
 
@@ -112,7 +112,9 @@ if UPSTREAM_REPO:
 
 
 UPDATE_PKGS = config_file.get("UPDATE_PKGS", "True")
-if (isinstance(UPDATE_PKGS, str) and UPDATE_PKGS.lower() == "true") or UPDATE_PKGS:
+if isinstance(UPDATE_PKGS, str):
+    UPDATE_PKGS = UPDATE_PKGS.strip().lower() in ("true", "1", "yes", "on")
+if UPDATE_PKGS:
     scall("uv pip uninstall pyrotgfork >/dev/null 2>&1 || true", shell=True)
     scall("uv pip uninstall pyrogram >/dev/null 2>&1 || true", shell=True)
     scall("uv pip uninstall pytgcrypto >/dev/null 2>&1 || true", shell=True)
