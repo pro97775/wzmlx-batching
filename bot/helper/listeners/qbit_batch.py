@@ -189,8 +189,6 @@ class QbitBatch(BatchRunner):
             checking_time = 0
             if state in ("stoppedDL", "stoppedUP", "pausedDL", "pausedUP"):
                 stopped_time += 3
-                if stopped_time >= STOPPED_ABORT:
-                    return False
             else:
                 stopped_time = 0
             try:
@@ -214,7 +212,7 @@ class QbitBatch(BatchRunner):
                 if not size:
                     continue
                 completed_size += min(size, int(size * progress))
-                if progress < 0.999:
+                if progress < 1:
                     complete = False
             if total_size:
                 self.listener.batch_selected_size = total_size
@@ -222,6 +220,8 @@ class QbitBatch(BatchRunner):
             if complete:
                 await sleep(2)
                 return True
+            if stopped_time >= STOPPED_ABORT:
+                return False
             await sleep(3)
 
     async def _stop_download_for_upload(self, batch):

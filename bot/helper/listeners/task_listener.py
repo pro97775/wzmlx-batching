@@ -415,7 +415,9 @@ class TaskListener(TaskConfig):
         self, link, files, folders, mime_type, rclone_path="", dir_id=""
     ):
         if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
-            await database.rm_complete_task(self.message.link)
+            await database.rm_complete_task(
+                self.message.link, self.message.chat.id, self.user_id
+            )
         msg = (
             f"<b><i>{escape(self.name)}</i></b>\n│"
             f"\n┟ <b>Task Size</b> → {get_readable_file_size(self.size)}"
@@ -633,7 +635,9 @@ class TaskListener(TaskConfig):
             await update_status_message(self.message.chat.id)
 
         if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
-            await database.rm_complete_task(self.message.link)
+            await database.rm_complete_task(
+                self.message.link, self.message.chat.id, self.user_id
+            )
 
         async with queue_dict_lock:
             if self.mid in queued_dl:
@@ -667,7 +671,9 @@ class TaskListener(TaskConfig):
             await update_status_message(self.message.chat.id)
 
         if (Config.INC_TASK_NOTIFY or Config.INC_TASK_RESUME) and Config.DATABASE_URL:
-            await database.rm_complete_task(self.message.link)
+            await database.rm_complete_task(
+                self.message.link, self.message.chat.id, self.user_id
+            )
 
         async with queue_dict_lock:
             if self.mid in queued_dl:

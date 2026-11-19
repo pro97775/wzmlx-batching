@@ -496,6 +496,16 @@ class TaskConfig:
         else:
             self.leech_dest = self.up_dest or self.user_dict.get("LEECH_DUMP_CHAT")
             self.up_dest = Config.LEECH_DUMP_CHAT
+            if (
+                self.is_leech
+                and self.is_super_chat
+                and not self.bot_pm
+                and not (self.leech_dest or self.up_dest)
+            ):
+                raise ValueError(
+                    "Add a Leech Destination in /usettings or enable Bot PM "
+                    "before using leech in a group."
+                )
             self.hybrid_leech = TgClient.IS_PREMIUM_USER and (
                 self.user_dict.get("HYBRID_LEECH")
                 or Config.HYBRID_LEECH

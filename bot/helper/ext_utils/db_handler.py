@@ -1,4 +1,5 @@
 from importlib import import_module
+from time import time
 from uuid import uuid4
 
 from aiofiles import open as aiopen
@@ -203,7 +204,7 @@ class DbManager:
         if self._return:
             return
         await self.db.tasks[_part()].update_one(
-            {"link": link},
+            {"link": link, "cid": cid, "user_id": user_id},
             {
                 "$setOnInsert": {
                     "_id": _new_uuid(),
@@ -218,6 +219,88 @@ class DbManager:
             },
             upsert=True,
         )
+
+    async def get_uploaded_file_keys(self, user_id, engine, torrent_hash):
+        if self._return:
+            return None
+        cursor = self.db.batch_files[_part()].find(
+            {
+                "user_id": user_id,
+                "engine": engine,
+                "hash": torrent_hash,
+                "uploaded": True,
+            },
+            {"_id": 1},
+        )
+        return {doc["_id"] async for doc in cursor}
+
+    async def mark_batch_files_downloaded(
+        self, user_id, engine, torrent_hash, files
+    ):
+        if self._return:
+            return
+        now = time()
+        for file_info in files:
+            index = int(file_info.get("index", 0))
+            await self.db.batch_files[_part()].update_one(
+                {
+                    "_id": (
+                        f"{user_id}:{engine}:{torrent_hash}:{index}"
+                    )
+                },
+                {
+                    "$set": {"downloaded": True, "downloaded_at": now},
+                    "$setOnInsert": {
+                        "user_id": user_id,
+                        "engine": engine,
+                        "hash": torrent_hash,
+                        "index": index,
+                        "name": str(file_info.get("name", "")),
+                        "size": int(file_info.get("size") or 0),
+                        "uploaded": False,
+                    },
+                },
+                upsert=True,
+            )
+
+    async def mark_batch_file_uploaded(
+        self,
+        user_id,
+        engine,
+        torrent_hash,
+        file_info,
+        destination="",
+        link="",
+    ):
+        if self._return:
+            return
+        index = int(file_info.get("index", 0))
+        await self.db.batch_files[_part()].update_one(
+            {"_id": f"{user_id}:{engine}:{torrent_hash}:{index}"},
+            {
+                "$set": {
+                    "user_id": user_id,
+                    "engine": engine,
+                    "hash": torrent_hash,
+                    "index": index,
+                    "name": str(file_info.get("name", "")),
+                    "size": int(file_info.get("size") or 0),
+                    "uploaded": True,
+                    "destination": destination,
+                    "link": link,
+                    "uploaded_at": time(),
+                }
+            },
+            upsert=True,
+        )
+
+    async def clear_uploaded_files(self, user_id):
+        if self._return:
+            return 0
+        result = await self.db.batch_files[_part()].delete_many(
+            {"user_id": user_id}
+        )
+        return result.deleted_count
 
     async def get_pm_uids(self):
         if self._return:
@@ -236,10 +319,15 @@ class DbManager:
             return
         await self.db.pm_users[_part()].delete_one({"_id": user_id})
 
-    async def rm_complete_task(self, link):
+    async def rm_complete_task(self, link, cid=None, user_id=None):
         if self._return:
             return
-        await self.db.tasks[_part()].delete_one({"link": link})
+        query = {"link": link}
+        if cid is not None:
+            query["cid"] = cid
+        if user_id is not None:
+            query["user_id"] = user_id
+        await self.db.tasks[_part()].delete_one(query)
 
     async def get_incomplete_tasks(self):
         notifier_dict = {}

@@ -166,7 +166,9 @@ async def _resume_tasks(notifier_dict):
                                 f"Resume: cannot fetch reply msg {reply_to_msg_id}: {e}"
                             )
                     await handler(TgClient.bot, msg)
-                    await database.rm_complete_task(task.get("link"))
+                    await database.rm_complete_task(
+                        task.get("link"), cid, user_id
+                    )
                 except Exception as e:
                     LOGGER.error(f"Resume: failed for '{command}' in {cid}: {e}")
 
