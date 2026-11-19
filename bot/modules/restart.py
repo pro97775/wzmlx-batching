@@ -128,7 +128,7 @@ async def _resume_tasks(notifier_dict):
                 command = task.get("command", "")
                 user_id = task.get("user_id", 0)
                 reply_to_msg_id = task.get("reply_to_msg_id", 0)
-                thread_id = task.get("thread_id", 0)
+                thread_id = task.get("message_thread_id", 0)
                 if not command or not user_id:
                     LOGGER.warning(
                         f"Resume: skipping task in {cid} "
@@ -166,11 +166,7 @@ async def _resume_tasks(notifier_dict):
                                 f"Resume: cannot fetch reply msg {reply_to_msg_id}: {e}"
                             )
                     await handler(TgClient.bot, msg)
-                    key = task.get("key")
-                    if key:
-                        await database.rm_incomplete_task(key)
-                    else:
-                        await database.rm_complete_task(task.get("link"))
+                    await database.rm_complete_task(task.get("link"))
                 except Exception as e:
                     LOGGER.error(f"Resume: failed for '{command}' in {cid}: {e}")
 
