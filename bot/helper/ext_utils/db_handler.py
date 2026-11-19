@@ -234,8 +234,7 @@ class DbManager:
                         ("engine", 1),
                         ("hash", 1),
                         ("uploaded", 1),
-                    ],
-                    name="batch_uploaded_lookup",
+                    ]
                 )
             except Exception as error:
                 LOGGER.warning(f"Could not create batch ledger index: {error}")
