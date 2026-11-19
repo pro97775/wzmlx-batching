@@ -1,11 +1,10 @@
-from asyncio import create_subprocess_exec, create_subprocess_shell
+from asyncio import create_subprocess_exec, create_subprocess_shell, sleep
 from importlib import import_module
 from os import environ, path as ospath, getenv
 
 from aiofiles import open as aiopen
 from aiofiles.os import makedirs, remove, path as aiopath
 from aioshutil import rmtree
-from pymongo.errors import PyMongoError
 
 
 from .. import (
@@ -21,8 +20,10 @@ from .. import (
     var_list,
     user_data,
     excluded_extensions,
+    nzb_options,
     qbit_options,
     rss_dict,
+    sabnzbd_client,
     sudo_users,
 )
 from ..helper.ext_utils.bot_utils import derive_service_password
@@ -31,23 +32,12 @@ from .config_manager import Config, BinConfig
 from .tg_client import TgClient, db_partition_id
 from .torrent_manager import TorrentManager
 
-_DB_CONFIG_KEYS = ("UPSTREAM_REPO", "UPSTREAM_BRANCH", "UPDATE_PKGS")
-
 
 def _qbit_password():
     return derive_service_password(
         (Config.BOT_TOKEN or "").split(":", 1)[0] or "0",
         "qbit",
     )
-
-
-_RECHECK_KEYS = ("recheck_completed_torrents", "recheck_completed_torrent")
-
-
-def _force_recheck_off(options, live=None):
-    for key in _RECHECK_KEYS:
-        if key in options or (live is not None and key in live):
-            options[key] = False
 
 
 async def update_qb_options():
@@ -60,21 +50,18 @@ async def update_qb_options():
             )
             return
         opt = await TorrentManager.qbittorrent.app.preferences()
-        _force_recheck_off(opt)
         qbit_options.update(opt)
         del qbit_options["listen_port"]
         for k in list(qbit_options.keys()):
             if k.startswith("rss"):
                 del qbit_options[k]
         qbit_options["web_ui_password"] = pwd
-        prefs = {"web_ui_password": pwd}
-        _force_recheck_off(prefs, opt)
-        await TorrentManager.qbittorrent.app.set_preferences(prefs)
+        await TorrentManager.qbittorrent.app.set_preferences(
+            {"web_ui_password": pwd}
+        )
     else:
         if qbit_options.get("web_ui_password") in ("admin", "admin1", ""):
             qbit_options["web_ui_password"] = pwd
-        live = await TorrentManager.qbittorrent.app.preferences()
-        _force_recheck_off(qbit_options, live)
         await TorrentManager.qbittorrent.app.set_preferences(qbit_options)
 
 
@@ -87,15 +74,28 @@ async def update_aria2_options():
         await TorrentManager.aria2.changeGlobalOption(aria2_options)
 
 
+async def update_nzb_options():
+    if Config.USENET_SERVERS:
+        LOGGER.info("Get SABnzbd options from server")
+        retries = 10
+        for i in range(retries):
+            try:
+                no = (await sabnzbd_client.get_config())["config"]["misc"]
+                nzb_options.update(no)
+                break
+            except Exception as e:
+                if i == retries - 1:
+                    LOGGER.error(
+                        f"Failed to get SABnzbd options after {retries} retries: {e}"
+                    )
+                    return
+                LOGGER.warning(
+                    f"SABnzbd not ready, retrying ({i + 1}/{retries}): {e}"
+                )
+                await sleep(2)
+
+
 async def load_settings():
-    try:
-        await _load_settings()
-    except PyMongoError as e:
-        LOGGER.error(f"Database ERROR: {e}")
-        database._return = True
-
-
-async def _load_settings():
     if not Config.DATABASE_URL:
         return
     for p in ["thumbnails", "tokens", "rclone"]:
@@ -141,21 +141,13 @@ async def _load_settings():
             )
 
         LOGGER.info("Updating.. Saved Config imported from MongoDB")
-        db_config = (
+        config_dict = (
             await database.db.settings.config.find_one(deploy_filter, {"_id": 0})
             or {}
         )
-        config_dict = dict(db_config)
         for k, v in config_file.items():
             if v is not None:
                 config_dict[k] = v
-        for k in _DB_CONFIG_KEYS:
-            value = db_config.get(k)
-            if value is None:
-                continue
-            if k == "UPSTREAM_REPO" and not str(value).strip():
-                continue
-            config_dict[k] = value
         if config_dict:
             Config.load_dict(config_dict)
 
@@ -178,7 +170,18 @@ async def _load_settings():
                 deploy_filter, {"_id": 0}
             ):
                 qbit_options.update(qbit_opt)
-                _force_recheck_off(qbit_options)
+
+        if nzb_opt := await database.db.settings.nzb.find_one(
+            deploy_filter, {"_id": 0}
+        ):
+            if await aiopath.exists("sabnzbd/SABnzbd.ini.bak"):
+                await remove("sabnzbd/SABnzbd.ini.bak")
+            for key, value in nzb_opt.items():
+                if value:
+                    file_ = key.replace("__", ".")
+                    async with aiopen(f"sabnzbd/{file_}", "wb+") as f:
+                        await f.write(value)
+            LOGGER.info("Loaded.. Sabnzbd Data from MongoDB")
 
         if await database.db.users[PART].find_one():
             rows = database.db.users[PART].find({})
@@ -242,6 +245,14 @@ async def save_settings():
         )
     if await database.db.settings.qbittorrent.find_one(deploy_filter) is None:
         await database.save_qbit_settings()
+    if await database.db.settings.nzb.find_one(deploy_filter) is None:
+        async with aiopen("sabnzbd/SABnzbd.ini", "rb+") as pf:
+            nzb_conf = await pf.read()
+        await database.db.settings.nzb.update_one(
+            deploy_filter, {"$set": {"SABnzbd__ini": nzb_conf}}, upsert=True
+        )
+
+
 async def update_variables():
     if (
         Config.LEECH_SPLIT_SIZE > TgClient.MAX_SPLIT_SIZE
@@ -353,7 +364,7 @@ async def load_configurations():
 
     await (
         await create_subprocess_shell(
-            f"chmod 600 .netrc && cp .netrc /root/.netrc && chmod +x setpkgs.sh && ./setpkgs.sh {BinConfig.ARIA2_NAME}"
+            f"chmod 600 .netrc && cp .netrc /root/.netrc && chmod +x setpkgs.sh && ./setpkgs.sh {BinConfig.ARIA2_NAME} {BinConfig.SABNZBD_NAME}"
         )
     ).wait()
 
@@ -369,6 +380,13 @@ async def load_configurations():
             f"{env}gunicorn -k uvicorn.workers.UvicornWorker -w 1 web.wserver:app --bind 0.0.0.0:{PORT}"
         )
         await create_subprocess_shell("python3 cron_boot.py")
+
+    if await aiopath.exists("cfg.zip"):
+        if await aiopath.exists("/JDownloader/cfg"):
+            await rmtree("/JDownloader/cfg", ignore_errors=True)
+        await (
+            await create_subprocess_exec("7z", "x", "cfg.zip", "-o/JDownloader")
+        ).wait()
 
     if await aiopath.exists("accounts.zip"):
         if await aiopath.exists("accounts"):

@@ -175,8 +175,12 @@ def time_to_seconds(time_duration):
 
 
 def speed_string_to_bytes(size_text: str):
+    if isinstance(size_text, (int, float)):
+        return int(size_text)
+    if not size_text:
+        return 0
     size = 0
-    size_text = size_text.lower()
+    size_text = str(size_text).lower()
     if "k" in size_text:
         size += float(size_text.split("k")[0]) * 1024
     elif "m" in size_text:
