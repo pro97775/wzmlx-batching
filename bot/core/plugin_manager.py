@@ -98,6 +98,9 @@ class PluginManager:
                 return False
 
             spec = importlib.util.spec_from_file_location(plugin_name, plugin_path)
+            if spec is None or spec.loader is None:
+                LOGGER.error(f"Could not create a module spec for {plugin_name}")
+                return False
             module = importlib.util.module_from_spec(spec)
             sys.modules[plugin_name] = module
             spec.loader.exec_module(module)

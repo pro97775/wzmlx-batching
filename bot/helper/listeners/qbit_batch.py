@@ -61,6 +61,7 @@ async def _wait_for_files(hash_, listener):
     fallback_started = False
     files = []
     while True:
+        files = []
         if listener.is_cancelled or intervals["stopAll"]:
             raise BatchError("Batch cancelled.")
         tor_info = await _torrent_info(hash_)
@@ -123,6 +124,8 @@ async def _wait_for_files(hash_, listener):
                     LOGGER.error(
                         f"qBittorrent batch metadata start error: {error}"
                     )
+        else:
+            checking_since = None
         if not files and time() - started >= METADATA_TIMEOUT:
             raise BatchError(
                 "Could not read the torrent file list. Metadata may be unavailable."

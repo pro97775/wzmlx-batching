@@ -55,14 +55,12 @@ class GoogleDriveDownload(GoogleDriveHelper):
                     self._updater.cancel()
                     return self.download()
                 err = "File not found!"
-            async_to_sync(self.listener.on_download_error, err)
             self.listener.is_cancelled = True
+            async_to_sync(self.listener.on_download_error, err)
         finally:
             self._updater.cancel()
-            if self.listener.is_cancelled:
-                return
+        if not self.listener.is_cancelled:
             async_to_sync(self.listener.on_download_complete)
-            return
 
     def _download_folder(self, folder_id, path, folder_name):
         folder_name = folder_name.replace("/", "")
