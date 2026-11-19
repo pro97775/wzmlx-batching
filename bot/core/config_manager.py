@@ -26,7 +26,6 @@ class Config:
     DISABLE_MULTI = False
     DISABLE_SEED = False
     DISABLE_FF_MODE = False
-    DISABLE_MEGA = False
     EQUAL_SPLITS = False
     EXCLUDED_EXTENSIONS = ""
     FFMPEG_CMDS = {}
@@ -58,18 +57,11 @@ class Config:
     INC_TASK_RESUME = False
     INDEX_URL = ""
     IS_TEAM_DRIVE = False
-    JD_EMAIL = ""
-    JD_PASS = ""
-    MEGA_EMAIL = ""
-    MEGA_PASSWORD = ""
     DIRECT_LIMIT = 0
-    MEGA_LIMIT = 0
     TORRENT_LIMIT = 0
     GD_DL_LIMIT = 0
     RC_DL_LIMIT = 0
     CLONE_LIMIT = 0
-    JD_LIMIT = 0
-    NZB_LIMIT = 0
     YTDLP_LIMIT = 0
     PLAYLIST_LIMIT = 0
     LEECH_LIMIT = 0
@@ -90,8 +82,6 @@ class Config:
     HYPER_THREADS = 0
     HYPER_PIPELINE = 32
     HYPER_CHUNK = 256 * 1024
-    HYDRA_IP = ""
-    HYDRA_API_KEY = ""
     NAME_SWAP = ""
     OWNER_ID = 0
     QUEUE_ALL = 0
@@ -134,7 +124,6 @@ class Config:
     UPSTREAM_REPO = ""
     UPSTREAM_BRANCH = ""
     UPDATE_PKGS = True
-    USENET_SERVERS = []
     USER_SESSION_STRING = ""
     USER_TRANSMISSION = True
     USE_SERVICE_ACCOUNTS = False
@@ -194,12 +183,6 @@ class Config:
                 ]:
                     if value:
                         value = value.strip("/")
-                elif attr == "USENET_SERVERS":
-                    try:
-                        if not value[0].get("host"):
-                            continue
-                    except Exception:
-                        continue
                 setattr(cls, attr, value)
         for key in ["BOT_TOKEN", "OWNER_ID", "TELEGRAM_API", "TELEGRAM_HASH"]:
             value = getattr(cls, key)
@@ -281,12 +264,6 @@ class Config:
                 ]:
                     if value:
                         value = value.strip("/")
-                elif key == "USENET_SERVERS":
-                    try:
-                        if not value[0].get("host"):
-                            value = []
-                    except Exception:
-                        value = []
                 value = cls._convert_env_type(key, value)
                 setattr(cls, key, value)
         for key in ["BOT_TOKEN", "OWNER_ID", "TELEGRAM_API", "TELEGRAM_HASH"]:
@@ -302,4 +279,3 @@ class BinConfig:
     QBIT_NAME = "stormtorrent"
     FFMPEG_NAME = "mediaforge"
     RCLONE_NAME = "ghostdrive"
-    SABNZBD_NAME = "newsripper"

@@ -1,4 +1,4 @@
-from asyncio import create_subprocess_exec, create_subprocess_shell, sleep
+from asyncio import create_subprocess_exec, create_subprocess_shell
 from importlib import import_module
 from os import environ, path as ospath, getenv
 
@@ -21,10 +21,8 @@ from .. import (
     var_list,
     user_data,
     excluded_extensions,
-    nzb_options,
     qbit_options,
     rss_dict,
-    sabnzbd_client,
     sudo_users,
 )
 from ..helper.ext_utils.bot_utils import derive_service_password
@@ -80,27 +78,6 @@ async def update_aria2_options():
         aria2_options.update(op)
     else:
         await TorrentManager.aria2.changeGlobalOption(aria2_options)
-
-
-async def update_nzb_options():
-    if Config.USENET_SERVERS:
-        LOGGER.info("Get SABnzbd options from server")
-        retries = 10
-        for i in range(retries):
-            try:
-                no = (await sabnzbd_client.get_config())["config"]["misc"]
-                nzb_options.update(no)
-                break
-            except Exception as e:
-                if i == retries - 1:
-                    LOGGER.error(
-                        f"Failed to get SABnzbd options after {retries} retries: {e}"
-                    )
-                    return
-                LOGGER.warning(
-                    f"SABnzbd not ready, retrying ({i + 1}/{retries}): {e}"
-                )
-                await sleep(2)
 
 
 async def load_settings():
@@ -195,18 +172,6 @@ async def _load_settings():
             ):
                 qbit_options.update(qbit_opt)
 
-        if nzb_opt := await database.db.settings.nzb.find_one(
-            deploy_filter, {"_id": 0}
-        ):
-            if await aiopath.exists("sabnzbd/SABnzbd.ini.bak"):
-                await remove("sabnzbd/SABnzbd.ini.bak")
-            for key, value in nzb_opt.items():
-                if value:
-                    file_ = key.replace("__", ".")
-                    async with aiopen(f"sabnzbd/{file_}", "wb+") as f:
-                        await f.write(value)
-            LOGGER.info("Loaded.. Sabnzbd Data from MongoDB")
-
         if await database.db.users[PART].find_one():
             rows = database.db.users[PART].find({})
             async for row in rows:
@@ -269,14 +234,6 @@ async def save_settings():
         )
     if await database.db.settings.qbittorrent.find_one(deploy_filter) is None:
         await database.save_qbit_settings()
-    if await database.db.settings.nzb.find_one(deploy_filter) is None:
-        async with aiopen("sabnzbd/SABnzbd.ini", "rb+") as pf:
-            nzb_conf = await pf.read()
-        await database.db.settings.nzb.update_one(
-            deploy_filter, {"$set": {"SABnzbd__ini": nzb_conf}}, upsert=True
-        )
-
-
 async def update_variables():
     if (
         Config.LEECH_SPLIT_SIZE > TgClient.MAX_SPLIT_SIZE
@@ -388,7 +345,7 @@ async def load_configurations():
 
     await (
         await create_subprocess_shell(
-            f"chmod 600 .netrc && cp .netrc /root/.netrc && chmod +x setpkgs.sh && ./setpkgs.sh {BinConfig.ARIA2_NAME} {BinConfig.SABNZBD_NAME}"
+            f"chmod 600 .netrc && cp .netrc /root/.netrc && chmod +x setpkgs.sh && ./setpkgs.sh {BinConfig.ARIA2_NAME}"
         )
     ).wait()
 
@@ -404,13 +361,6 @@ async def load_configurations():
             f"{env}gunicorn -k uvicorn.workers.UvicornWorker -w 1 web.wserver:app --bind 0.0.0.0:{PORT}"
         )
         await create_subprocess_shell("python3 cron_boot.py")
-
-    if await aiopath.exists("cfg.zip"):
-        if await aiopath.exists("/JDownloader/cfg"):
-            await rmtree("/JDownloader/cfg", ignore_errors=True)
-        await (
-            await create_subprocess_exec("7z", "x", "cfg.zip", "-o/JDownloader")
-        ).wait()
 
     if await aiopath.exists("accounts.zip"):
         if await aiopath.exists("accounts"):

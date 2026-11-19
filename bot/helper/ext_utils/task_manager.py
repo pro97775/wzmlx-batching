@@ -197,11 +197,8 @@ async def limit_checker(listener, yt_playlist=0):
 
     limits = [
         (listener.is_torrent or listener.is_qbit, "TORRENT_LIMIT", "Torrent"),
-        (listener.is_mega, "MEGA_LIMIT", "Mega"),
         (listener.is_gdrive, "GD_DL_LIMIT", "GDriveDL"),
         (listener.is_clone, "CLONE_LIMIT", "Clone"),
-        (listener.is_jd, "JD_LIMIT", "JDownloader"),
-        (listener.is_nzb, "NZB_LIMIT", "SABnzbd"),
         (listener.is_rclone, "RC_DL_LIMIT", "RCloneDL"),
         (listener.is_ytdlp, "YTDLP_LIMIT", "YT-DLP"),
         (bool(yt_playlist), "PLAYLIST_LIMIT", "Playlist"),

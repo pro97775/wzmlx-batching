@@ -71,9 +71,9 @@ WZML-X is built for users who want a single bot stack that can mirror, leech, ma
 |---|---|
 | Mirroring | Send files to Telegram with a controllable pipeline |
 | Leeching | Deliver files in the format you prefer, including document and media workflows |
-| File selection UI | Review and select torrent / NZB / upload contents before finalizing |
-| Multi-source downloads | Use qBittorrent, Aria2, JDownloader, Mega, NZB, and yt-dlp integrations |
-| Storage and upload paths | Push content to Google Drive, Rclone, Mega, and other supported routes |
+| File selection UI | Review and select torrent / upload contents before finalizing |
+| Multi-source downloads | Use qBittorrent, Aria2, and yt-dlp integrations |
+| Storage and upload paths | Push content to Google Drive, Rclone, and other supported routes |
 | Automation | Limit tasks, tune queues, and manage startup updates from one config layer |
 
 ## How It Runs
@@ -86,7 +86,7 @@ Deploy with Docker and provide the required configuration values. The container 
    - Docker installed
    - Your Telegram bot token and Telegram API credentials
    - A MongoDB connection string
-   - The optional service credentials you want to enable, such as Drive, Rclone, Mega, JDownloader, or SABnzbd
+   - The optional service credentials you want to enable, such as Drive or Rclone
 </details>
 
 ## Deployment
@@ -146,7 +146,7 @@ Deploy with Docker and provide the required configuration values. The container 
    docker buildx compose up -d
    ```
 
-   Each bot gets its own cloudflared tunnel URL. Admin ports (qBittorrent, SABnzbd) are mapped to different host ports (`127.0.0.1:8091`, etc.).
+   Each bot gets its own cloudflared tunnel URL. Admin ports (qBittorrent) are mapped to different host ports (`127.0.0.1:8091`, etc.).
 </details>
 
 <details>
@@ -239,9 +239,6 @@ Torrent Settings to reset the ledger for that user.
    The sample config also covers:
 
    - qBittorrent and Aria2-related controls
-   - JDownloader login details
-   - Mega credentials
-   - SABnzbd server definitions
    - Google Drive settings
    - RSS, search, media metadata, and logging controls
 </details>
@@ -255,7 +252,6 @@ Torrent Settings to reset the ledger for that user.
 | `gen_scripts/` | Setup helpers for sessions, tokens, and drive configuration |
 | `plugins/` | Optional bot plugins |
 | `qBittorrent/` | Default qBittorrent configuration |
-| `sabnzbd/` | Default SABnzbd configuration |
 
 ## Documentation
 

@@ -26,7 +26,6 @@ from aioqbt.client import create_client
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
-from sabnzbdapi import SabnzbdClient
 from aioqbt.exc import AQError
 
 from web.nodes import extract_file_ids, make_tree
@@ -161,13 +160,7 @@ def _verify_pin(gid, pin):
 
 aria2 = None
 qbittorrent = None
-sabnzbd_client = SabnzbdClient(
-    host="http://localhost",
-    api_key=_service_pwd("sabnzbd"),
-    port="8070",
-)
 SERVICES = {
-    "nzb": {"url": "http://localhost:8070/", "password": _service_pwd("sabnzbd")},
     "qbit": {"url": "http://localhost:8090", "password": _service_pwd("qbit")},
 }
 
@@ -322,9 +315,7 @@ async def handle_torrent(request: Request):
                 }
         else:
             selected_files, unselected_files = extract_file_ids(data)
-            if gid.startswith("SABnzbd_nzo"):
-                await set_sabnzbd(gid, unselected_files)
-            elif len(gid) > 20:
+            if len(gid) > 20:
                 await set_qbittorrent(gid, selected_files, unselected_files)
             else:
                 selected_files = ",".join(selected_files)
@@ -337,10 +328,7 @@ async def handle_torrent(request: Request):
             }
     else:
         try:
-            if gid.startswith("SABnzbd_nzo"):
-                res = await sabnzbd_client.get_files(gid)
-                content = make_tree(res, "sabnzbd")
-            elif len(gid) > 20:
+            if len(gid) > 20:
                 res = await qbittorrent.torrents.files(gid)
                 content = make_tree(res, "qbittorrent")
             else:
@@ -369,11 +357,6 @@ async def handle_rename(gid, data):
             await qbittorrent.torrents.rename_folder(hash=gid, **data)
     except (ClientError, TimeoutError, Exception, AQError) as e:
         LOGGER.error(f"{e} Errored in renaming")
-
-
-async def set_sabnzbd(gid, unselected_files):
-    await sabnzbd_client.remove_file(gid, unselected_files)
-    LOGGER.info(f"Verified! nzo_id: {gid}")
 
 
 async def set_qbittorrent(gid, selected_files, unselected_files):
@@ -488,10 +471,6 @@ async def protected_proxy(
         )
     return response
 
-
-@app.api_route("/nzb/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
-async def sabnzbd_proxy(path: str = "", request: Request = None):
-    return await protected_proxy("nzb", path, request)
 
 
 @app.api_route("/qbit/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])

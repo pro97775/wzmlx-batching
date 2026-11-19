@@ -31,7 +31,6 @@ services:
       - ./config.py:/usr/src/app/config.py:ro
       - ./accounts:/usr/src/app/accounts
       - ./downloads:/usr/src/app/downloads
-      - ./sabnzbd:/usr/src/app/sabnzbd
     expose:
       - "8080"
 
@@ -50,7 +49,6 @@ services:
   #     - ./config2.py:/usr/src/app/config.py:ro
   #     - ./app2.accounts:/usr/src/app/accounts
   #     - ./app2.downloads:/usr/src/app/downloads
-  #     - ./app2.sabnzbd:/usr/src/app/sabnzbd
   #   expose:
   #     - "8080"
   #   ports:

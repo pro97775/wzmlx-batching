@@ -26,10 +26,6 @@ from .mirror_leech import (
     leech,
     qb_leech,
     qb_mirror,
-    jd_leech,
-    jd_mirror,
-    nzb_leech,
-    nzb_mirror,
     uphoster,
 )
 from .restart import (
@@ -41,7 +37,6 @@ from .restart import (
 from .imdb import imdb_search, imdb_callback
 from .rss import get_rss_menu, rss_listener
 from .search import torrent_search, torrent_search_update, initiate_search_tools
-from .nzb_search import hydra_search
 from .services import start, start_cb, login, ping, log, log_cb
 from .shell import run_shell
 from .stats import bot_stats, stats_pages, get_packages_version
@@ -67,7 +62,6 @@ __all__ = [
     "clone_node",
     "aioexecute",
     "execute",
-    "hydra_search",
     "clear",
     "select",
     "confirm_selection",
@@ -82,10 +76,6 @@ __all__ = [
     "leech",
     "qb_leech",
     "qb_mirror",
-    "jd_leech",
-    "jd_mirror",
-    "nzb_leech",
-    "nzb_mirror",
     "restart_bot",
     "restart_notification",
     "confirm_restart",

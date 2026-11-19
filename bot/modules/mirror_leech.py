@@ -16,7 +16,6 @@ from ..helper.ext_utils.exceptions import DirectDownloadLinkException
 from ..helper.ext_utils.links_utils import (
     is_gdrive_id,
     is_gdrive_link,
-    is_mega_link,
     is_magnet,
     is_rclone_path,
     is_telegram_link,
@@ -34,9 +33,6 @@ from ..helper.mirror_leech_utils.download_utils.direct_link_generator import (
     direct_link_generator,
 )
 from ..helper.mirror_leech_utils.download_utils.gd_download import add_gd_download
-from ..helper.mirror_leech_utils.download_utils.jd_download import add_jd_download
-from ..helper.mirror_leech_utils.download_utils.mega_download import add_mega_download
-from ..helper.mirror_leech_utils.download_utils.nzb_downloader import add_nzb
 from ..helper.mirror_leech_utils.download_utils.qbit_download import add_qb_torrent
 from ..helper.listeners.qbit_batch import add_qb_batch
 from ..helper.mirror_leech_utils.download_utils.rclone_download import (
@@ -60,8 +56,6 @@ class Mirror(TaskListener):
         message,
         is_qbit=False,
         is_leech=False,
-        is_jd=False,
-        is_nzb=False,
         is_uphoster=False,
         same_dir=None,
         bulk=None,
@@ -82,8 +76,6 @@ class Mirror(TaskListener):
         super().__init__()
         self.is_qbit = is_qbit
         self.is_leech = is_leech
-        self.is_jd = is_jd
-        self.is_nzb = is_nzb
         self.is_uphoster = is_uphoster
 
     async def new_event(self):
@@ -312,8 +304,6 @@ class Mirror(TaskListener):
                 nextmsg,
                 self.is_qbit,
                 self.is_leech,
-                self.is_jd,
-                self.is_nzb,
                 self.is_uphoster,
                 self.same_dir,
                 self.bulk,
@@ -343,7 +333,7 @@ class Mirror(TaskListener):
                     reply_to = None
             elif reply_to.document and (
                 file_.mime_type == "application/x-bittorrent"
-                or file_.file_name.endswith((".torrent", ".dlc", ".nzb"))
+                or file_.file_name.endswith((".torrent", ".dlc"))
             ):
                 self.link = await reply_to.download()
                 file_ = None
@@ -360,7 +350,6 @@ class Mirror(TaskListener):
             and not is_rclone_path(self.link)
             and not is_gdrive_id(self.link)
             and not is_gdrive_link(self.link)
-            and not is_mega_link(self.link)
         ):
             await send_message(
                 self.message, COMMAND_USAGE["mirror"][0], COMMAND_USAGE["mirror"][1]
@@ -383,16 +372,13 @@ class Mirror(TaskListener):
         self._set_mode_engine()
 
         if (
-            not self.is_jd
-            and not self.is_nzb
-            and not self.is_qbit
+            not self.is_qbit
             and not is_magnet(self.link)
             and not is_rclone_path(self.link)
             and not is_gdrive_link(self.link)
             and not self.link.endswith(".torrent")
             and file_ is None
             and not is_gdrive_id(self.link)
-            and not is_mega_link(self.link)
         ):
             content_type = await get_content_type(self.link)
             if content_type is None or re_match(r"text/html|text/plain", content_type):
@@ -438,21 +424,15 @@ class Mirror(TaskListener):
             )
         elif isinstance(self.link, dict):
             await add_direct_download(self, path)
-        elif self.is_jd:
-            await add_jd_download(self, path)
         elif self.is_qbit:
             if self.batch_mode:
                 await add_qb_batch(self, path, ratio, seed_time)
             else:
                 await add_qb_torrent(self, path, ratio, seed_time)
-        elif self.is_nzb:
-            await add_nzb(self, path)
         elif is_rclone_path(self.link):
             await add_rclone_download(self, f"{path}/")
         elif is_gdrive_link(self.link) or is_gdrive_id(self.link):
             await add_gd_download(self, path)
-        elif is_mega_link(self.link):
-            await add_mega_download(self, f"{path}/")
         else:
             ussr = args["-au"]
             pssw = args["-ap"]
@@ -472,30 +452,6 @@ async def qb_mirror(client, message):
     bot_loop.create_task(Mirror(client, message, is_qbit=True).new_event())
 
 
-async def jd_mirror(client, message):
-    bot_loop.create_task(Mirror(client, message, is_jd=True).new_event())
-
-
-async def nzb_mirror(client, message):
-    text_parts = message.text.split()
-    nzb_id = None
-    if len(text_parts) > 1 and not text_parts[1].startswith(("http", "ftp", "/")):
-        potential_id = text_parts[1]
-        clean = potential_id.lstrip("-").replace("_", "")
-        if clean.isalnum() and not (potential_id.startswith("-") and clean.isalpha()):
-            nzb_id = potential_id
-            nzb_url = f"{Config.HYDRA_IP.rstrip('/')}/getnzb/api/{nzb_id}?apikey={Config.HYDRA_API_KEY}"
-            extra = " ".join(text_parts[2:])
-            message.text = f"/nzbmirror {nzb_url} -e {extra}".strip()
-    else:
-        if "-e" not in message.text:
-            message.text += " -e"
-    mirror_task = Mirror(client, message, is_nzb=True)
-    if nzb_id:
-        mirror_task.nzb_id = nzb_id
-    bot_loop.create_task(mirror_task.new_event())
-
-
 async def leech(client, message):
     if Config.DISABLE_LEECH:
         await message.reply("The Leech command is currently disabled.")
@@ -507,30 +463,6 @@ async def qb_leech(client, message):
     bot_loop.create_task(
         Mirror(client, message, is_qbit=True, is_leech=True).new_event()
     )
-
-
-async def jd_leech(client, message):
-    bot_loop.create_task(Mirror(client, message, is_leech=True, is_jd=True).new_event())
-
-
-async def nzb_leech(client, message):
-    text_parts = message.text.split()
-    nzb_id = None
-    if len(text_parts) > 1 and not text_parts[1].startswith(("http", "ftp", "/")):
-        potential_id = text_parts[1]
-        clean = potential_id.lstrip("-").replace("_", "")
-        if clean.isalnum() and not (potential_id.startswith("-") and clean.isalpha()):
-            nzb_id = potential_id
-            nzb_url = f"{Config.HYDRA_IP.rstrip('/')}/getnzb/api/{nzb_id}?apikey={Config.HYDRA_API_KEY}"
-            extra = " ".join(text_parts[2:])
-            message.text = f"/nzbleech {nzb_url} -e {extra}".strip()
-    else:
-        if "-e" not in message.text:
-            message.text += " -e"
-    mirror_task = Mirror(client, message, is_leech=True, is_nzb=True)
-    if nzb_id:
-        mirror_task.nzb_id = nzb_id
-    bot_loop.create_task(mirror_task.new_event())
 
 
 async def uphoster(client, message):

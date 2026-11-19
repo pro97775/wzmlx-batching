@@ -63,8 +63,6 @@ debrid_link_supported_sites = [
     "katfile.com",
     "kshared.com",
     "mediafire.com",
-    "mega.nz",
-    "mega.co.nz",
     "mexashare.com",
     "mixdrop.co",
     "mixdrop.to",
