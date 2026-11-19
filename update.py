@@ -154,7 +154,9 @@ def _run_update(upstream_repo, upstream_branch, version):
 
 
 def _update_packages(update_pkgs):
-    if (isinstance(update_pkgs, str) and update_pkgs.lower() == "true") or update_pkgs:
+    if isinstance(update_pkgs, str):
+        update_pkgs = update_pkgs.strip().lower() in ("true", "1", "yes", "on")
+    if update_pkgs:
         scall("uv pip uninstall pyrotgfork >/dev/null 2>&1 || true", shell=True)
         scall("uv pip uninstall pyrogram >/dev/null 2>&1 || true", shell=True)
         scall("uv pip uninstall pytgcrypto >/dev/null 2>&1 || true", shell=True)
