@@ -1,4 +1,4 @@
-FROM pro97775/heroku:ownv3
+FROM pro97775/heroku:ariaqbit
 
 WORKDIR /usr/src/app
 

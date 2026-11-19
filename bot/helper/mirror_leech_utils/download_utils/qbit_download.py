@@ -15,6 +15,7 @@ from ....core.config_manager import Config
 from ....core.torrent_manager import TorrentManager
 from ...ext_utils.bot_utils import bt_selection_buttons
 from ...ext_utils.task_manager import check_running_tasks
+from ...listeners.qbit_batch import add_qb_batch
 from ...listeners.qbit_listener import on_download_start
 from ...mirror_leech_utils.status_utils.qbit_status import QbittorrentStatus
 from ...telegram_helper.message_utils import (
@@ -45,6 +46,10 @@ def _get_hash_file(fpath):
 async def add_qb_torrent(listener, path, ratio, seed_time):
     if Config.DISABLE_TORRENTS:
         await listener.on_download_error("Torrents are disabled in the configuration.")
+        return
+    if listener.files_per_batch > 0:
+        listener.enable_batch_mode()
+        await add_qb_batch(listener, path, ratio, seed_time)
         return
     try:
         form = AddFormBuilder.with_client(TorrentManager.qbittorrent)

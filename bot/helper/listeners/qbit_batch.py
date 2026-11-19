@@ -49,7 +49,9 @@ ACTIVE_STATES = (
 
 async def _torrent_info(hash_):
     infos = await TorrentManager.qbittorrent.torrents.info(hashes=[hash_])
-    return infos[0] if infos else None
+    if infos:
+        return infos[0]
+    return None
 
 
 async def _wait_for_files(hash_, listener):
@@ -62,7 +64,9 @@ async def _wait_for_files(hash_, listener):
             if tor_info.state == "error":
                 raise BatchError("qBittorrent download failed. Check the torrent.")
             if tor_info.state == "missingFiles":
-                raise BatchError("qBittorrent reports missing files for this torrent.")
+                raise BatchError(
+                    "qBittorrent reports missing files for this torrent."
+                )
             try:
                 files = await TorrentManager.qbittorrent.torrents.files(hash_)
             except Exception as error:
@@ -70,7 +74,7 @@ async def _wait_for_files(hash_, listener):
                 files = []
             if (
                 files
-                and any(int(getattr(item, "size", 0) or 0) for item in files)
+                and any(int(getattr(item, "size", 0)) for item in files)
                 and tor_info.state not in ("metaDL", "checkingResumeData")
             ):
                 return tor_info, files
@@ -88,7 +92,7 @@ class QbitBatch(BatchRunner):
         entries = []
         for file_info in files:
             name = str(file_info.name or "")
-            if not name or name.startswith("[METADATA]"):
+            if name and name.startswith("[METADATA]"):
                 continue
             entries.append(
                 {
@@ -168,7 +172,9 @@ class QbitBatch(BatchRunner):
                 return False
             state = tor_info.state
             if state in ("error", "missingFiles"):
-                raise BatchError("qBittorrent could not download the current batch.")
+                raise BatchError(
+                    "qBittorrent could not download the current batch."
+                )
             if state in ("checkingUP", "checkingDL", "checkingResumeData"):
                 checking_time += 3
                 if checking_time >= CHECKING_ABORT:
@@ -205,10 +211,11 @@ class QbitBatch(BatchRunner):
                 size = int(current.size or file_info["size"] or 0)
                 progress = float(getattr(current, "progress", 0) or 0)
                 total_size += size
-                if size:
-                    completed_size += min(size, int(size * progress))
-                    if progress < 0.999:
-                        complete = False
+                if not size:
+                    continue
+                completed_size += min(size, int(size * progress))
+                if progress < 0.999:
+                    complete = False
             if total_size:
                 self.listener.batch_selected_size = total_size
                 self.listener.batch_completed_size = completed_size
@@ -289,6 +296,7 @@ async def add_qb_batch(listener, path, ratio, seed_time):
             if time() - started >= 60:
                 raise BatchError("qBittorrent did not add the torrent.")
             await sleep(1)
+
         hash_ = tor_info.hash
         listener.name = tor_info.name
 
@@ -309,21 +317,19 @@ async def add_qb_batch(listener, path, ratio, seed_time):
         batch = QbitBatch(listener, hash_, files, path)
         if add_to_queue:
             await event.wait()
-            if listener.is_cancelled:
-                return
-            async with task_dict_lock:
-                if task := task_dict.get(listener.mid):
-                    task.queued = False
-
+        if listener.is_cancelled:
+            return
+        async with task_dict_lock:
+            if task := task_dict.get(listener.mid):
+                task.queued = False
         await listener.on_download_start()
         if listener.multi <= 1 and not listener.is_rss:
             await send_status_message(listener.message)
         bot_loop.create_task(batch.run())
     except BatchError as error:
         await _cleanup_failed_batch(listener, hash_, tag)
-        if listener.is_cancelled or intervals["stopAll"]:
-            return
-        await listener.on_download_error(str(error))
+        if not listener.is_cancelled and not intervals["stopAll"]:
+            await listener.on_download_error(str(error))
     except Exception as error:
         LOGGER.error(f"qBittorrent batch setup error: {error}")
         await _cleanup_failed_batch(listener, hash_, tag)

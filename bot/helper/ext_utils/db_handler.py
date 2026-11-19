@@ -214,22 +214,25 @@ class DbManager:
     ):
         if self._return:
             return
-        await self.db.tasks[_part()].update_one(
-            {"link": link},
-            {
-                "$setOnInsert": {
-                    "_id": _new_uuid(),
-                    "cid": cid,
-                    "tag": tag,
-                    "link": link,
-                    "command": command,
-                    "user_id": user_id,
-                    "reply_to_msg_id": reply_to_msg_id,
-                    "thread_id": thread_id,
-                }
-            },
-            upsert=True,
-        )
+        try:
+            await self.db.tasks[_part()].update_one(
+                {"link": link},
+                {
+                    "$setOnInsert": {
+                        "_id": _new_uuid(),
+                        "cid": cid,
+                        "tag": tag,
+                        "link": link,
+                        "command": command,
+                        "user_id": user_id,
+                        "reply_to_msg_id": reply_to_msg_id,
+                        "thread_id": thread_id,
+                    }
+                },
+                upsert=True,
+            )
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to save incomplete task {link}: {e}")
 
     async def get_pm_uids(self):
         if self._return:
@@ -259,7 +262,10 @@ class DbManager:
     async def rm_complete_task(self, link):
         if self._return:
             return
-        await self.db.tasks[_part()].delete_one({"link": link})
+        try:
+            await self.db.tasks[_part()].delete_one({"link": link})
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to remove complete task {link}: {e}")
 
     async def rm_incomplete_task(self, key):
         if self._return:
@@ -373,35 +379,41 @@ class DbManager:
         notifier_dict = {}
         if self._return:
             return notifier_dict
-        if await self.db.tasks[_part()].find_one():
-            rows = self.db.tasks[_part()].find({})
-            async for row in rows:
-                link = row.get("link") or row.get("_id")
-                if not link:
-                    continue
-                cid = row["cid"]
-                tag = row["tag"]
-                task_data = {
-                    "key": row["_id"],
-                    "link": link,
-                    "command": row.get("command", ""),
-                    "user_id": row.get("user_id", 0),
-                    "reply_to_msg_id": row.get("reply_to_msg_id", 0),
-                    "thread_id": row.get("thread_id", 0),
-                }
-                if cid in notifier_dict:
-                    if tag in notifier_dict[cid]:
-                        notifier_dict[cid][tag].append(task_data)
+        try:
+            if await self.db.tasks[_part()].find_one():
+                rows = self.db.tasks[_part()].find({})
+                async for row in rows:
+                    link = row.get("link") or row.get("_id")
+                    if not link:
+                        continue
+                    cid = row["cid"]
+                    tag = row["tag"]
+                    task_data = {
+                        "key": row["_id"],
+                        "link": link,
+                        "command": row.get("command", ""),
+                        "user_id": row.get("user_id", 0),
+                        "reply_to_msg_id": row.get("reply_to_msg_id", 0),
+                        "thread_id": row.get("thread_id", 0),
+                    }
+                    if cid in notifier_dict:
+                        if tag in notifier_dict[cid]:
+                            notifier_dict[cid][tag].append(task_data)
+                        else:
+                            notifier_dict[cid][tag] = [task_data]
                     else:
-                        notifier_dict[cid][tag] = [task_data]
-                else:
-                    notifier_dict[cid] = {tag: [task_data]}
+                        notifier_dict[cid] = {tag: [task_data]}
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to load incomplete tasks: {e}")
         return notifier_dict
 
     async def trunc_table(self, name):
         if self._return:
             return
-        await self.db[name][_part()].drop()
+        try:
+            await self.db[name][_part()].drop()
+        except PyMongoError as e:
+            LOGGER.error(f"Failed to truncate {name}: {e}")
 
 
 database = DbManager()

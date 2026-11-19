@@ -34,7 +34,6 @@ from ..helper.mirror_leech_utils.download_utils.direct_link_generator import (
 )
 from ..helper.mirror_leech_utils.download_utils.gd_download import add_gd_download
 from ..helper.mirror_leech_utils.download_utils.qbit_download import add_qb_torrent
-from ..helper.listeners.qbit_batch import add_qb_batch
 from ..helper.mirror_leech_utils.download_utils.rclone_download import (
     add_rclone_download,
 )
@@ -333,7 +332,7 @@ class Mirror(TaskListener):
                     reply_to = None
             elif reply_to.document and (
                 file_.mime_type == "application/x-bittorrent"
-                or file_.file_name.endswith((".torrent", ".dlc"))
+                or file_.file_name.endswith(".torrent")
             ):
                 self.link = await reply_to.download()
                 file_ = None
@@ -405,19 +404,6 @@ class Mirror(TaskListener):
 
         await delete_links(self.message)
 
-        if (
-            self.is_qbit
-            and not self.select
-            and not self.same_dir
-            and self.files_per_batch > 0
-            and isinstance(self.link, str)
-            and (
-                self.link.startswith("magnet:")
-                or self.link.lower().endswith(".torrent")
-            )
-        ):
-            self.enable_batch_mode()
-
         if file_ is not None:
             await TelegramDownloadHelper(self).add_download(
                 reply_to, f"{path}/", session
@@ -425,10 +411,7 @@ class Mirror(TaskListener):
         elif isinstance(self.link, dict):
             await add_direct_download(self, path)
         elif self.is_qbit:
-            if self.batch_mode:
-                await add_qb_batch(self, path, ratio, seed_time)
-            else:
-                await add_qb_torrent(self, path, ratio, seed_time)
+            await add_qb_torrent(self, path, ratio, seed_time)
         elif is_rclone_path(self.link):
             await add_rclone_download(self, f"{path}/")
         elif is_gdrive_link(self.link) or is_gdrive_id(self.link):
