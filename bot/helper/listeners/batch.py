@@ -2,6 +2,7 @@
 
 from asyncio import gather
 from os import path as ospath, symlink
+from time import time
 
 from aiofiles.os import makedirs, remove, rename, rmdir
 from aiofiles.os import path as aiopath
@@ -261,7 +262,14 @@ class BatchRunner:
                 f"{self.engine} batch start: save_path={self.task_root} "
                 f"content_path={self.content_path}"
             )
+            ledger_started = time()
             await self._load_uploaded_files()
+            if getattr(self.listener, "skip_uploaded_files", False):
+                LOGGER.info(
+                    f"{self.engine} batch: uploaded history loaded in "
+                    f"{time() - ledger_started:.2f}s "
+                    f"({len(self.uploaded_keys)} keys)"
+                )
             if self.uploaded_keys:
                 skipped_files = [
                     file_info

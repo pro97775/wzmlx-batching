@@ -35,6 +35,7 @@ class DbManager:
         self._return = True
         self._conn = None
         self.db = None
+        self._batch_index_ready = False
 
     async def connect(self):
         try:
@@ -44,6 +45,7 @@ class DbManager:
                 Config.DATABASE_URL, server_api=ServerApi("1")
             )
             self.db = self._conn.wzmlx
+            self._batch_index_ready = False
             self._return = False
         except PyMongoError as e:
             LOGGER.error(f"Error in DB connection: {e}")
@@ -223,7 +225,22 @@ class DbManager:
     async def get_uploaded_file_keys(self, user_id, engine, torrent_hash):
         if self._return:
             return None
-        cursor = self.db.batch_files[_part()].find(
+        collection = self.db.batch_files[_part()]
+        if not self._batch_index_ready:
+            try:
+                await collection.create_index(
+                    [
+                        ("user_id", 1),
+                        ("engine", 1),
+                        ("hash", 1),
+                        ("uploaded", 1),
+                    ],
+                    name="batch_uploaded_lookup",
+                )
+            except Exception as error:
+                LOGGER.warning(f"Could not create batch ledger index: {error}")
+            self._batch_index_ready = True
+        cursor = collection.find(
             {
                 "user_id": user_id,
                 "engine": engine,

@@ -27,6 +27,7 @@ from .batch import BatchError, BatchRunner
 from .qbit_listener import on_download_start
 
 METADATA_TIMEOUT = 300
+CHECKING_TIMEOUT = 900
 STOPPED_ABORT = 60
 CHECKING_ABORT = 600
 ACTIVE_STATES = (
@@ -56,17 +57,35 @@ async def _torrent_info(hash_):
 
 async def _wait_for_files(hash_, listener):
     started = time()
+    checking_since = None
+    fallback_started = False
+    files = []
     while True:
         if listener.is_cancelled or intervals["stopAll"]:
             raise BatchError("Batch cancelled.")
         tor_info = await _torrent_info(hash_)
         if tor_info is not None:
-            if tor_info.state == "error":
+            state = tor_info.state
+            if state == "error":
                 raise BatchError("qBittorrent download failed. Check the torrent.")
-            if tor_info.state == "missingFiles":
+            if state == "missingFiles":
                 raise BatchError(
                     "qBittorrent reports missing files for this torrent."
                 )
+            if state in (
+                "checkingDL",
+                "checkingUP",
+                "checkingResumeData",
+                "allocating",
+                "moving",
+            ):
+                checking_since = checking_since or time()
+                if time() - checking_since >= CHECKING_TIMEOUT:
+                    raise BatchError(
+                        "qBittorrent is stuck checking the torrent files."
+                    )
+            else:
+                checking_since = None
             try:
                 files = await TorrentManager.qbittorrent.torrents.files(hash_)
             except Exception as error:
@@ -75,10 +94,36 @@ async def _wait_for_files(hash_, listener):
             if (
                 files
                 and any(int(getattr(item, "size", 0)) for item in files)
-                and tor_info.state not in ("metaDL", "checkingResumeData")
+                and state
+                not in (
+                    "metaDL",
+                    "checkingResumeData",
+                    "checkingDL",
+                    "checkingUP",
+                    "allocating",
+                    "moving",
+                )
             ):
+                waited = time() - started
+                if waited >= 5:
+                    LOGGER.info(
+                        f"qBittorrent batch: files ready after {waited:.1f}s"
+                    )
                 return tor_info, files
-        if time() - started >= METADATA_TIMEOUT:
+            if (
+                not files
+                and not fallback_started
+                and time() - started >= 15
+                and not listener.link.startswith("magnet:")
+            ):
+                fallback_started = True
+                try:
+                    await TorrentManager.qbittorrent.torrents.start([hash_])
+                except Exception as error:
+                    LOGGER.error(
+                        f"qBittorrent batch metadata start error: {error}"
+                    )
+        if not files and time() - started >= METADATA_TIMEOUT:
             raise BatchError(
                 "Could not read the torrent file list. Metadata may be unavailable."
             )
@@ -308,7 +353,7 @@ async def add_qb_batch(listener, path, ratio, seed_time):
             task_dict[listener.mid] = QbittorrentStatus(listener, queued=add_to_queue)
         listener.is_torrent = True
 
-        if not local_torrent:
+        if listener.link.startswith("magnet:"):
             await TorrentManager.qbittorrent.torrents.start([hash_])
         tor_info, files = await _wait_for_files(hash_, listener)
         listener.name = tor_info.name
