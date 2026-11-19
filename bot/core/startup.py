@@ -41,6 +41,15 @@ def _qbit_password():
     )
 
 
+_RECHECK_KEYS = ("recheck_completed_torrents", "recheck_completed_torrent")
+
+
+def _force_recheck_off(options, live=None):
+    for key in _RECHECK_KEYS:
+        if key in options or (live is not None and key in live):
+            options[key] = False
+
+
 async def update_qb_options():
     LOGGER.info("Get qBittorrent options from server")
     pwd = _qbit_password()
@@ -51,8 +60,7 @@ async def update_qb_options():
             )
             return
         opt = await TorrentManager.qbittorrent.app.preferences()
-        if "recheck_completed_torrent" in opt:
-            opt["recheck_completed_torrent"] = False
+        _force_recheck_off(opt)
         qbit_options.update(opt)
         del qbit_options["listen_port"]
         for k in list(qbit_options.keys()):
@@ -60,14 +68,13 @@ async def update_qb_options():
                 del qbit_options[k]
         qbit_options["web_ui_password"] = pwd
         prefs = {"web_ui_password": pwd}
-        if "recheck_completed_torrent" in opt:
-            prefs["recheck_completed_torrent"] = False
+        _force_recheck_off(prefs, opt)
         await TorrentManager.qbittorrent.app.set_preferences(prefs)
     else:
         if qbit_options.get("web_ui_password") in ("admin", "admin1", ""):
             qbit_options["web_ui_password"] = pwd
-        if "recheck_completed_torrent" in qbit_options:
-            qbit_options["recheck_completed_torrent"] = False
+        live = await TorrentManager.qbittorrent.app.preferences()
+        _force_recheck_off(qbit_options, live)
         await TorrentManager.qbittorrent.app.set_preferences(qbit_options)
 
 
@@ -171,6 +178,7 @@ async def _load_settings():
                 deploy_filter, {"_id": 0}
             ):
                 qbit_options.update(qbit_opt)
+                _force_recheck_off(qbit_options)
 
         if await database.db.users[PART].find_one():
             rows = database.db.users[PART].find({})
